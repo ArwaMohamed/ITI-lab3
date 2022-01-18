@@ -4,6 +4,10 @@ const fs = require('fs')
 const validateUser = async (req, res, next) =>{
     try {
         const {username , password} = req.body;
+        if(!username && req.method == "POST")
+        return next({status:422,message:"user name is required"})
+        if(!password && req.method == "POST")
+        return next({status:422,message:"password is required"})
         const data = await fs.promises.readFile('./user.json',{encoding:'utf8'})
         const users = JSON.parse(data)
         const isUsernameExists = users.some(user=>user.username===username)
