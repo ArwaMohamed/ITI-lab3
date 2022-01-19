@@ -35,12 +35,12 @@ router.patch("/:userId", validateUser, async (req, res, next) => {
      const newUser = users.map((user) => {
       if (user.id !== req.params.userId)return user;
         //bouns
-        // else if(username !==user.username)
-        // return{ username:username , password, age, id: req.params.userId }
-        // else if(password !==user.password)
-        // return{ username, password:password, age, id: req.params.userId }
-        // else if(age !==user.age)
-        // return{ username:users.username, password, age:age, id: req.params.userId }
+        else if(username !==user.username)
+        return{ username:username , password, age, id: req.params.userId }
+        else if(password !==user.password)
+        return{ username, password:password, age, id: req.params.userId }
+        else if(age !==user.age)
+        return{ username:users.username, password, age:age, id: req.params.userId }
 
     return { username, password, age, id: req.params.userId };
     });
@@ -59,16 +59,16 @@ router.get("/",async (req, res, next) => {
     const users = await fs.promises
     .readFile("./user.json", { encoding: "utf8" })
     .then((data) => JSON.parse(data));
-  const filteredUsers = users.filter((user) => user.age === age);
-   res.send(filteredUsers);
+    if(req.query.age){
+      const age = Number(req.query.age);
+    const filteredUsers = users.filter((user) => user.age === age);
+     res.send(filteredUsers);}
+  else{
+     const allUsers=users.map((user)=>user.username)
+          res.send({users: allUsers});
+  }
   } catch (error) {
-      //bouns
-     const users = await fs.promises
-    .readFile("./user.json", { encoding: "utf8" })
-    .then((data) => JSON.parse(data));
-        const allUsers=users.map((user)=>user.username)
-        res.send({users: allUsers});
-    
+  
     next({ status: 500, internalMessage: error.message });
   }
 });

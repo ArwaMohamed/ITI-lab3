@@ -9,13 +9,10 @@ const logRequest = async(req,res,next)=>{
        const users =JSON.parse(data)
     //    console.log(username,users.username);
 
-       users.map((user)=>{
-        if(user.username===username && user.password === password) 
-         return res.status(200).send({message:"Login sucess"})
-        return res.status(403).send({message:"Try Again"})
-      })
+    const user = users.find(ele=>ele.username===username)
+    return (user.password == password) ? res.send("Login sucess") : res.status(401).send("invalid creds")
     } catch (error){
-        next({status:403 , internalMessage:error.message})
+        next({status:500 , internalMessage:error.message})
       }
    
 }
@@ -31,7 +28,7 @@ const getUserId = async(req,res,next)=>{
     res.send(filteredUsers)
         next()
     } catch (error) {
-        next({ status: 404, internalMessage: error.message });
+        next({ status: 500, internalMessage: error.message });
         }
 }
 module.exports = {
