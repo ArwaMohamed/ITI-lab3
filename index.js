@@ -1,26 +1,116 @@
+require('dotenv').config()
+// console.log(process.env);
+// require('.env')
 const express = require('express')
-const fs = require('fs')
+// const fs = require('fs')
 const app = express()
 const port = 3000
 const bodyParser = require('body-parser')
 const userRouter = require('./routers/usersRouter')
-// const {validateUser}= require('./userHelpers')
-// const {logRequest,getUserId} = require('./generalHelpers')
-// const { v4: uuidv4 } = require("uuid");
+const {logRequest} = require('./generalHelpers')
+const { v4: uuidv4 } = require("uuid");
+const { validateUser } = require("./userHelpers");
+var jwt = require('jsonwebtoken');
+const serverConfig = require('./serverConfig')
+const { auth } = require('./middlewares/auth')
+const User = require('./models/User')
+const sign = require('jsonwebtoken/sign')
+require('./mongoConnect')
 
 app.use(bodyParser.json())
 
-app.use('/users',userRouter)
+app.post("/users/login", async (req, res, next) => {
+  try {
+      const {username, password} = req.body
+      const user = await User.findOne({ username })
+      if(!user) return next({status:401, message:"username or passord is incorrect"})
+      if(user.password !== password) next({status:401, message:"username or passord is incorrect"})
+      const payload = {id:user.id }
+      const token = jwt.sign(payload,serverConfig.secret,{expiresIn:"1h"})
+      // console.log(token);
+      return res.status(200).send({message:"Logged in Successfully",token}) 
+    
+  } catch (error) {
+    next({status:500 , internalMessage:error.message})
+  }
+})
+app.post("/users", async (req, res, next) => {
+  try {
+      const { username, age, password } = req.body;
+      const user = new User({username, age, password})
+      await user.save()
+      res.send({ message: "sucess" });
+  } catch (error) {
+      next({ status: 422, message: error.message });
+  }
+});
 
-//Error handler
+app.patch("/users/:id", auth , async (req, res, next) => {
+  if(req.user.id!==req.params.id) next({status:403, message:"Authorization error"})
+  try {
+    const {password, age} = req.body
+    req.user.password = password
+    req.user.age = age
+    await req.user.save()
+    res.send("sucess")
+  } catch (error) {
+
+  }
+
+});
+
+app.get('/users', async (req,res,next)=>{
+ console.log(req.token);
+  try {
+    const getUser = req.query.age ?{age:req.query.age}: {}
+   
+    const users = await User.find(getUser,{username:1,age:1})
+  res.send(users)
+  } catch (error) {
+  next({ status: 500, internalMessage: error.message });
+  }
+
+})
+app.get('/users/:userId',auth, async (req,res,next)=>{
+  try {
+      if(req.user.id!==req.params.userId) next({status:403, message:"Authorization error"})
+  const users = await User.find({})
+  res.send(users)
+
+  } catch (error) {
+    next({ status: 500, internalMessage: error.message });
+
+  }
+
+})
+
+app.delete('/users/:userId',auth ,async(req,res,next)=>{
+  if(req.user.id!==req.params.userId) next({status:403, message:"Authorization error"})
+  try {
+    const user_id = req.params.userId
+    const getUser = await User.find({_id:user_id})
+    console.log(getUser);
+    const del = await User.deleteOne({getUser})
+    return res.send({message:"delete user done"})
+  } catch (error) {
+    next({ status: 404, internalMessage: error.message });
+
+  }
+})
+
+
 app.use((err,req,res,next)=>{
-  if(err.status >= 500)
-    return res.status(500).send({error:"internal server erorr"})
   res.status(err.status).send(err.message)
-  
-  })
-  
-  
+})
+
+
+
+
+
+
+
+
+
   
   app.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`)
@@ -53,91 +143,3 @@ git commit -m "message"
 git push
 */
 
-/* 
-//POST 
-app.post("/users", validateUser, async (req, res, next) => {
-  try {
-      const { username, age, password } = req.body;
-      const data = await fs.promises
-          .readFile("./user.json", { encoding: "utf8" })
-          .then((data) => JSON.parse(data));
-      const id = uuidv4();
-      data.push({ id, username, age, password });
-      await fs.promises.writeFile("./user.json", JSON.stringify(data), {
-          encoding: "utf8",
-      });
-      res.send({ id, message: "sucess" });
-  } catch (error) {
-      next({ status: 500, internalMessage: error.message });
-  }
-});
-PATCH
-app.patch("/users/:userId", validateUser, async (req, res, next) => {
-//http://localhost:3000/users/4bc79df0-38b7-43bb-ad5e-aa0799cfbee
-
-  try{
-   const {username , password,age}=req.body
-   const users = await fs.promises
-   .readFile("./user.json",{encoding:'utf8'})
-   .then((data) => JSON.parse(data));
-
-   const newUser = users.map((user)=>{
-     if(user.id!==req.params.userId) 
-      return user
-    return {username , password , age, id:req.params.userId}
-   })
-   await fs.promises.writeFile("./user.json", JSON.stringify(newUser), {
-    encoding: "utf8",
-});
-res.status(200).send({message:"user edited sucessfully"})
-  }catch (error){
-    next({status:500 , internalMessage:error.message})
-  }
-});
-
-GET
-app.get('/users',getUserId, async (req,res,next)=>{
-  //http://localhost:3000/users?age=22
-  try {
-  const age = Number(req.query.age)
-  const users = await fs.promises
-  .readFile("./user.json", { encoding: "utf8" })
-  .then((data) => JSON.parse(data));
-  const filteredUsers = users.filter(user=>user.age===age)
-  res.send(filteredUsers)
-  } catch (error) {
-  next({ status: 500, internalMessage: error.message });
-  }
-
-})
-
-Delete
-app.delete('/users/:id', async(req,res,next)=>{
-try {
-  const id =req.params.id
-    const users = await fs.promises
-    .readFile("./user.json",{encoding:'utf8'})
-    .then((data) => JSON.parse(data));
-    // console.log(users.splice(deletItem));
-    const deletItem = users.filter((user)=>user.id ===id)
-    // console.log(users.splice(deletItem,1))
-      const newUser =users.splice(deletItem,1);
-      await fs.promises.writeFile("./user.json", JSON.stringify(newUser), {
-        encoding: "utf8",
-    });
-    
-      return res.send({message:"user deleted"});
-  
-} catch (error) {
-  next({ status: 404, internalMessage: error.message })
-}
-})
-
-
-
-login User
-app.post('/users/login',logRequest)
-
-*/
-
-// app.use(logRequest,validateUser)
